@@ -2,7 +2,7 @@
 PriceNet
 ========
 
-Fun with Neural Networks and [https://brain.js.org/](brain.js).
+Fun with Neural Networks and [brain.js](https://brain.js.org/).
 
 **This repository only contains crazy (as in "bat-shit-crazy") experiments with neural networks.**
 
