@@ -4,6 +4,7 @@
 const {URL} = require('url')
 const http  = require('http')
 const https = require('https')
+const utils = require('util')
 const brain = require('brain.js')
 
 
@@ -59,9 +60,7 @@ function getData(url)
 
         if (res && res.Data && res.Data.length)
         {
-            const result = res.Data.map( item => item.close )
-
-            return Promise.resolve(result)
+            return Promise.resolve(res.Data)
         }
         else
         {
@@ -70,34 +69,110 @@ function getData(url)
             return Promise.resolve([])
         }
     })
+}
+
+function pricesData(data)
+{
+    if (data && data.length)
+    {
+        const result = data.map( item => item.close )
+
+        return Promise.resolve(result)
+    }
+    else
+    {
+        console.log('Empty results!')
+
+        return Promise.resolve([])
+    }
+}
+
+function buildData(data)
+{
+    let item = 0
+    let count = 0
+    const result = [{ input: [NaN, NaN, NaN], output: [NaN]}]
+
+    for (let close of data)
+    {
+        if (item < 3)
+        {
+            result[count].input[item] = close
+        }
+        else
+        {
+            result[count].output[0] = close
+        }
+
+        item++
+
+        if (item === 4 && count < data.length / 4 - 1)
+        {
+            item = 0
+            count++
+            result.push({ input: [NaN, NaN, NaN], output: [NaN]})
+        }
+    }
+
+    console.log(`Got #${result.length} of inputs...`)
+
+    return Promise.resolve(result)
+}
+
+function normalizeVolumes(data)
+{
+    const items = data.map( item => item.volumeto )
+
+    const min  = Math.min.apply(null, items)
+    const max  = Math.max(...items)
+    const diff = max - min
+
+    const result = []
+
+    items.map( volume => (volume - min) / diff )
+    // Cleanup data:
+    .forEach( item =>
+    {
+        if (!isNaN(item))
+        {
+            result.push(item)
+        }
+        else
+        {
+            result.push(0)
+        }
+    })
+
+    return Promise.resolve(result)
+}
+
+function buildVolumeData(data)
+{
+    return normalizeVolumes(data)
     .then( data =>
     {
-        let item = 0
         let count = 0
-        const result = [{ input: [NaN, NaN, NaN], output: [NaN]}]
+        let index = 0
+        const result = [[NaN, NaN, NaN, NaN]]
 
-        for (let close of data)
+        for (let item of data)
         {
-            if (item < 3)
-            {
-                result[count].input[item] = close
-            }
-            else
-            {
-                result[count].output[0] = close
-            }
+            result[count][index % 4] = item
 
-            item++
+            // Discard last volume:
+            result[count] = result[count].slice(0, -1)
 
-            if (item === 4 && count < data.length / 4 - 1)
+            index++
+
+            if (index > 0 && index % 3 === 0)
             {
-                item = 0
                 count++
-                result.push({ input: [NaN, NaN, NaN], output: [NaN]})
+
+                result.push([NaN, NaN, NaN, NaN])
             }
         }
 
-        console.log(`Got #${result.length} of inputs...`)
+        console.log(`Got #${result.length} of volumes...`)
 
         return Promise.resolve(result)
     })
@@ -124,7 +199,7 @@ function normalize(data)
     // Remove empty or incomplete data:
     .reduce( (result, element) =>
     {
-        if (!result)
+        if (!result || !result.push)
         {
             result = []
         }
@@ -141,11 +216,26 @@ function normalize(data)
         }
 
         return result
-
-    }, [])
+    })
 
     return Promise.resolve(result)
 }
+
+function addVolumes(data, volumes)
+{
+    let index = 0
+
+    for (let item of data)
+    {
+        if (volumes[index] && item.input)
+        {
+            item.input = item.input.concat(volumes[index])
+        }
+    }
+
+    return Promise.resolve(data)
+}
+
 
 function printData(data)
 {
@@ -177,19 +267,37 @@ const url = `https://min-api.cryptocompare.com/data/histohour?`
 
 console.log(`Calling URL "${url}"...`)
 
+let volumes
+
 getData(url)
+.then( data =>
+{
+    // Save volume triplets to add them later:
+    return new Promise( (resolve, reject) =>
+    {
+        buildVolumeData(data)
+        .then( data => volumes = data )
+        .then(   () => resolve(data) )
+        .catch( err => reject(err) )
+    })
+})
+.then( data => pricesData(data) )
+.then( data => buildData(data) )
 .then( data => normalize(data) )
+.then( data => addVolumes(data, volumes) )
 .then( trainData =>
 {
+    const testSamples = 8
+
     // Get last one to be test-data
-    const testData = trainData.slice(-1)
-    trainData = trainData.slice(0, -1)
+    const testData = trainData.slice(-testSamples)
+    trainData = trainData.slice(0, -testSamples)
 
     console.log(`Training with data "${printData(trainData)}"...`)
 
     const options =
     {
-        iterations: 40000
+        iterations: 100000
     }
 
     const result = net.train(trainData, options)
@@ -202,10 +310,22 @@ getData(url)
 {
     console.log(`Testing with data "${printData(testData)}"...`)
 
-    const output = net.run(testData[0].input)
+    const outputs = []
+    let error = 0
 
-    console.log(`Predicted: ${output}`)
-    console.log(`Actual:    ${testData[0].output}`)
-    console.log(`Error:     ${Math.abs(testData[0].output - output)}`)
+    for (let item of testData)
+    {
+        const output = net.run(item.input)
+
+        outputs.push(output)
+
+        error += Math.abs(item.output - output)
+    }
+
+    error = error / testData.length
+
+    console.log(`Predicted: ${utils.inspect(outputs)}`)
+    console.log(`Actual:    ${utils.inspect(testData)}`)
+    console.log(`Error:     ${error}`)
 })
 .catch( err => console.log(err) )
