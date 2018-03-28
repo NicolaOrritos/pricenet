@@ -4,7 +4,7 @@
 const {URL} = require('url')
 const http  = require('http')
 const https = require('https')
-const utils = require('util')
+// const utils = require('util')
 const brain = require('brain.js')
 
 
@@ -121,9 +121,9 @@ function buildData(data)
 
 function normalizeVolumes(data)
 {
-    const items = data.map( item => item.volumeto )
+    const items = data.map( item => item.volumeto - item.volumefrom )
 
-    const min  = Math.min.apply(null, items)
+    const min  = Math.min(...items)
     const max  = Math.max(...items)
     const diff = max - min
 
@@ -133,6 +133,8 @@ function normalizeVolumes(data)
     // Cleanup data:
     .forEach( item =>
     {
+        console.log(`Found volume "${item}"`)
+
         if (!isNaN(item))
         {
             result.push(item)
@@ -157,22 +159,29 @@ function buildVolumeData(data)
 
         for (let item of data)
         {
-            result[count][index % 4] = item
-
-            // Discard last volume:
-            result[count] = result[count].slice(0, -1)
+            result[count][index] = item
 
             index++
 
-            if (index > 0 && index % 3 === 0)
+            if (index === 4)
             {
+                // Discard last volume:
+                result[count] = result[count].slice(0, -1)
+            }
+
+            if (index === 4 && count < data.length / 4 - 1)
+            {
+                index = 0
                 count++
 
+                // Prepare the next voulumes quadruplet:
                 result.push([NaN, NaN, NaN, NaN])
             }
         }
 
         console.log(`Got #${result.length} of volumes...`)
+
+        console.log(`Volumes: ${result}`)
 
         return Promise.resolve(result)
     })
@@ -230,6 +239,8 @@ function addVolumes(data, volumes)
         if (volumes[index] && item.input)
         {
             item.input = item.input.concat(volumes[index])
+
+            index++
         }
     }
 
@@ -258,10 +269,11 @@ const net = new brain.NeuralNetwork()
 const exchange = 'CCCAGG'
 const curr = 'BTC'
 const fiat = 'USD'
+const samples = 5 * 80
 
 const url = `https://min-api.cryptocompare.com/data/histohour?`
           + `fsym=${curr}&tsym=${fiat}`
-          + `&limit=240`
+          + `&limit=${samples}`
           + `&e=${exchange}`
           + '&aggregate=1'
 
@@ -297,7 +309,7 @@ getData(url)
 
     const options =
     {
-        iterations: 100000
+        iterations: 200000
     }
 
     const result = net.train(trainData, options)
@@ -324,8 +336,8 @@ getData(url)
 
     error = error / testData.length
 
-    console.log(`Predicted: ${utils.inspect(outputs)}`)
-    console.log(`Actual:    ${utils.inspect(testData)}`)
-    console.log(`Error:     ${error}`)
+    /* console.log(`Predicted: ${utils.inspect(outputs)}`)
+    console.log(`Actual:    ${utils.inspect(testData)}`) */
+    console.log(`Error:     ${error} [mean]`)
 })
 .catch( err => console.log(err) )
