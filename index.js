@@ -5,7 +5,7 @@ const {URL} = require('url')
 const http  = require('http')
 const https = require('https')
 // const utils = require('util')
-const brain = require('brain.js')
+const syn   = require('synaptic')
 
 
 function GET(url, headers = {})
@@ -133,8 +133,6 @@ function normalizeVolumes(data)
     // Cleanup data:
     .forEach( item =>
     {
-        console.log(`Found volume "${item}"`)
-
         if (!isNaN(item))
         {
             result.push(item)
@@ -178,10 +176,6 @@ function buildVolumeData(data)
                 result.push([NaN, NaN, NaN, NaN])
             }
         }
-
-        console.log(`Got #${result.length} of volumes...`)
-
-        console.log(`Volumes: ${result}`)
 
         return Promise.resolve(result)
     })
@@ -247,6 +241,31 @@ function addVolumes(data, volumes)
     return Promise.resolve(data)
 }
 
+function stringify(data)
+{
+    if (data)
+    {
+        for (let item of data)
+        {
+            if (item.input && item.output)
+            {
+                for (let index in item.input)
+                {
+                    item.input[index] = '' + item.input[index]
+                }
+
+                item.output[0] = '' + item.output[0]
+            }
+        }
+
+        return Promise.resolve(data)
+    }
+    else
+    {
+        return Promise.reject(new Error('No data provided'))
+    }
+}
+
 
 function printData(data)
 {
@@ -263,13 +282,17 @@ function printData(data)
     return result
 }
 
+// Shutup jshint:
+void printData
 
-const net = new brain.NeuralNetwork()
+
+
+const network = new syn.Architect.Perceptron(6, 6, 12, 1)
 
 const exchange = 'CCCAGG'
 const curr = 'BTC'
 const fiat = 'USD'
-const samples = 5 * 80
+const samples = 8 * 80
 
 const url = `https://min-api.cryptocompare.com/data/histohour?`
           + `fsym=${curr}&tsym=${fiat}`
@@ -297,22 +320,31 @@ getData(url)
 .then( data => buildData(data) )
 .then( data => normalize(data) )
 .then( data => addVolumes(data, volumes) )
+.then( data => stringify(data) )
 .then( trainData =>
 {
-    const testSamples = 8
+    const trainer = new syn.Trainer(network)
+
+    const testSamples = 16
 
     // Get last one to be test-data
     const testData = trainData.slice(-testSamples)
     trainData = trainData.slice(0, -testSamples)
 
-    console.log(`Training with data "${printData(trainData)}"...`)
+    console.log(`Training with ${trainData.length} samples...`)
 
     const options =
     {
-        iterations: 200000
+        iterations: 100000,
+
+        log: 2000,
+
+        shuffle: true,
+        rate: 0.1,
+        error: 0.003
     }
 
-    const result = net.train(trainData, options)
+    const result = trainer.train(trainData, options)
 
     console.log(`Training results: ${JSON.stringify(result)}`)
 
@@ -320,24 +352,24 @@ getData(url)
 })
 .then( testData =>
 {
-    console.log(`Testing with data "${printData(testData)}"...`)
+    console.log(`Testing ${testData.length} samples...`)
 
     const outputs = []
     let error = 0
 
     for (let item of testData)
     {
-        const output = net.run(item.input)
+        const output = network.activate(item.input)
 
         outputs.push(output)
 
-        error += Math.abs(item.output - output)
+        error += Math.pow(item.output - output, 2)
     }
 
     error = error / testData.length
 
     /* console.log(`Predicted: ${utils.inspect(outputs)}`)
     console.log(`Actual:    ${utils.inspect(testData)}`) */
-    console.log(`Error:     ${error} [mean]`)
+    console.log(`Error:     ${error} [MSE]`)
 })
 .catch( err => console.log(err) )

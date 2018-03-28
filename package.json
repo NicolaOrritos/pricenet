@@ -9,6 +9,6 @@
   "author": "Nicola Orritos",
   "license": "MIT",
   "dependencies": {
-    "brain.js": "^1.1.2"
+    "synaptic": "^1.1.4"
   }
 }

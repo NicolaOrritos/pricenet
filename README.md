@@ -2,7 +2,7 @@
 PriceNet
 ========
 
-Fun with Neural Networks and [brain.js](https://brain.js.org/).
+Fun with Neural Networks and [Synaptic](http://caza.la/synaptic).
 
 **This repository only contains crazy (as in "bat-shit-crazy") experiments with neural networks.**
 
