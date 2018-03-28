@@ -287,12 +287,12 @@ void printData
 
 
 
-const network = new syn.Architect.Perceptron(6, 6, 12, 1)
+const network = new syn.Architect.Perceptron(6, 12, 1)
 
 const exchange = 'CCCAGG'
 const curr = 'BTC'
 const fiat = 'USD'
-const samples = 8 * 80
+const samples = 12 * 80
 
 const url = `https://min-api.cryptocompare.com/data/histohour?`
           + `fsym=${curr}&tsym=${fiat}`
@@ -325,7 +325,7 @@ getData(url)
 {
     const trainer = new syn.Trainer(network)
 
-    const testSamples = 16
+    const testSamples = 24
 
     // Get last one to be test-data
     const testData = trainData.slice(-testSamples)
@@ -335,13 +335,13 @@ getData(url)
 
     const options =
     {
-        iterations: 100000,
+        iterations: 200000,
 
-        log: 2000,
+        log: 10000,
 
         shuffle: true,
-        rate: 0.1,
-        error: 0.003
+        rate: 0.2,
+        error: 0.005
     }
 
     const result = trainer.train(trainData, options)
