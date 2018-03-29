@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import requests
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
 
 
 def GET(url):
@@ -50,183 +53,108 @@ def combine_data(prices, volumes):
     return [prices[item]['input'].extend(volumes[item]) for item in range(len(prices))]
 
 
+def baseline_model():
+    model = Sequential()
+    model.add(Dense(6, input_dim=6, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(1, kernel_initializer='normal'))
+
+    model.compile(optimizer='rmsprop', loss='mse')
+
+    return model
+
+estimator = KerasRegressor(build_fn=baseline_model)
+# estimator.fit()
 
 
 
 
-function GET(url, headers = {})
-{}
-
-function getData(url)
-{}
-
-function pricesData(data)
-{}
-
-function buildData(data)
-{}
-
-function normalizeVolumes(data)
-{
-    const items = data.map( item => item.volumeto - item.volumefrom )
-
-    const min  = Math.min(...items)
-    const max  = Math.max(...items)
-    const diff = max - min
-
-    const result = []
-
-    items.map( volume => (volume - min) / diff )
-    // Cleanup data:
-    .forEach( item =>
-    {
-        if (!isNaN(item))
-        {
-            result.push(item)
-        }
-        else
-        {
-            result.push(0)
-        }
-    })
-
-    return Promise.resolve(result)
-}
-
-function buildVolumeData(data)
-{}
-
-function normalize(data)
-{
-    const result = data.map( item =>
-    {
-        let {input} = item
-        input = input.concat([item.output])
-
-        const min  = Math.min(...input)
-        const max  = Math.max(...input)
-        const diff = max - min
-
-        const normalized = input.map( close => (close - min) / diff )
-
-        return {
-            input:  normalized.slice(0, 3),
-            output: [normalized[3]]
-        }
-    })
-    // Remove empty or incomplete data:
-    .reduce( (result, element) =>
-    {
-        if (!result || !result.push)
-        {
-            result = []
-        }
-
-        if (   element
-            && element.input
-            && !isNaN(element.input[0])
-            && !isNaN(element.input[1])
-            && !isNaN(element.input[2])
-            && element.output
-            && !isNaN(element.output[0]) )
-        {
-            result.push(element)
-        }
-
-        return result
-    })
-
-    return Promise.resolve(result)
-}
-
-function addVolumes(data, volumes)
-{}
 
 
 
-const network = new syn.Architect.Perceptron(6, 12, 1)
 
-const exchange = 'CCCAGG'
-const curr = 'BTC'
-const fiat = 'USD'
-const samples = 12 * 80
-
-const url = `https://min-api.cryptocompare.com/data/histohour?`
-          + `fsym=${curr}&tsym=${fiat}`
-          + `&limit=${samples}`
-          + `&e=${exchange}`
-          + '&aggregate=1'
-
-console.log(`Calling URL "${url}"...`)
-
-let volumes
-
-getData(url)
-.then( data =>
-{
-    // Save volume triplets to add them later:
-    return new Promise( (resolve, reject) =>
-    {
-        buildVolumeData(data)
-        .then( data => volumes = data )
-        .then(   () => resolve(data) )
-        .catch( err => reject(err) )
-    })
-})
-.then( data => pricesData(data) )
-.then( data => buildData(data) )
-.then( data => normalize(data) )
-.then( data => addVolumes(data, volumes) )
-.then( data => stringify(data) )
-.then( trainData =>
-{
-    const trainer = new syn.Trainer(network)
-
-    const testSamples = 24
-
-    // Get last one to be test-data
-    const testData = trainData.slice(-testSamples)
-    trainData = trainData.slice(0, -testSamples)
-
-    console.log(`Training with ${trainData.length} samples...`)
-
-    const options =
-    {
-        iterations: 200000,
-
-        log: 10000,
-
-        shuffle: true,
-        rate: 0.2,
-        error: 0.005
-    }
-
-    const result = trainer.train(trainData, options)
-
-    console.log(`Training results: ${JSON.stringify(result)}`)
-
-    return Promise.resolve(testData)
-})
-.then( testData =>
-{
-    console.log(`Testing ${testData.length} samples...`)
-
-    const outputs = []
-    let error = 0
-
-    for (let item of testData)
-    {
-        const output = network.activate(item.input)
-
-        outputs.push(output)
-
-        error += Math.pow(item.output - output, 2)
-    }
-
-    error = error / testData.length
-
-    /* console.log(`Predicted: ${utils.inspect(outputs)}`)
-    console.log(`Actual:    ${utils.inspect(testData)}`) */
-    console.log(`Error:     ${error} [MSE]`)
-})
-.catch( err => console.log(err) )
+# const network = new syn.Architect.Perceptron(6, 12, 1)
+#
+# const exchange = 'CCCAGG'
+# const curr = 'BTC'
+# const fiat = 'USD'
+# const samples = 12 * 80
+#
+# const url = `https://min-api.cryptocompare.com/data/histohour?`
+#           + `fsym=${curr}&tsym=${fiat}`
+#           + `&limit=${samples}`
+#           + `&e=${exchange}`
+#           + '&aggregate=1'
+#
+# console.log(`Calling URL "${url}"...`)
+#
+# let volumes
+#
+# getData(url)
+# .then( data =>
+# {
+#     // Save volume triplets to add them later:
+#     return new Promise( (resolve, reject) =>
+#     {
+#         buildVolumeData(data)
+#         .then( data => volumes = data )
+#         .then(   () => resolve(data) )
+#         .catch( err => reject(err) )
+#     })
+# })
+# .then( data => pricesData(data) )
+# .then( data => buildData(data) )
+# .then( data => normalize(data) )
+# .then( data => addVolumes(data, volumes) )
+# .then( data => stringify(data) )
+# .then( trainData =>
+# {
+#     const trainer = new syn.Trainer(network)
+#
+#     const testSamples = 24
+#
+#     // Get last one to be test-data
+#     const testData = trainData.slice(-testSamples)
+#     trainData = trainData.slice(0, -testSamples)
+#
+#     console.log(`Training with ${trainData.length} samples...`)
+#
+#     const options =
+#     {
+#         iterations: 200000,
+#
+#         log: 10000,
+#
+#         shuffle: true,
+#         rate: 0.2,
+#         error: 0.005
+#     }
+#
+#     const result = trainer.train(trainData, options)
+#
+#     console.log(`Training results: ${JSON.stringify(result)}`)
+#
+#     return Promise.resolve(testData)
+# })
+# .then( testData =>
+# {
+#     console.log(`Testing ${testData.length} samples...`)
+#
+#     const outputs = []
+#     let error = 0
+#
+#     for (let item of testData)
+#     {
+#         const output = network.activate(item.input)
+#
+#         outputs.push(output)
+#
+#         error += Math.pow(item.output - output, 2)
+#     }
+#
+#     error = error / testData.length
+#
+#     /* console.log(`Predicted: ${utils.inspect(outputs)}`)
+#     console.log(`Actual:    ${utils.inspect(testData)}`) */
+#     console.log(`Error:     ${error} [MSE]`)
+# })
+# .catch( err => console.log(err) )
