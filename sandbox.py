@@ -4,6 +4,9 @@ import requests
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import numpy as np
+import pandas as pd
+import json
+import pytz
 
 
 def GET(url):
@@ -16,29 +19,31 @@ def GET(url):
 def get_data(url):
     raw = GET(url)
 
-    return raw['Data']
+    return json.dumps(raw['Data'])
 
 
 def get_prices(data):
-    return [item['close'] for item in data]
 
+    aux = pd.read_json(data, convert_dates=['time'])
 
-def get_volumes(data):
-    return [item['volumeto'] - item['volumefrom'] for item in data]
+    result = pd.DataFrame(aux, columns=['time', 'close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+
+    rome_tz = pytz.timezone('Europe/Rome')
+
+    result['time'].dt.tz_localize(pytz.UTC).dt.tz_convert(rome_tz)
+
+    return result
 
 
 def group(data, step=4):
-    return [data[a:(a + step)] for a in range(0, len(data), step)]
 
+    data['group_info'] = ['data' if (index+1)%step != 0 else 'target' for index, _ in data.iterrows()]
 
-def build_inputs(data, inputs_count=3, outputs_count=1):
-    result = {}
-    result['input'] = data[0:(inputs_count - 1)]
+    data['type'] = data['group_info'].astype('category')
 
-    if outputs_count > 0:
-        result['output'] = data[-outputs_count:]
+    del(data['group_info'])
 
-    return result
+    return data
 
 
 def normalize(data):
@@ -47,10 +52,6 @@ def normalize(data):
     diff = mx - mn
 
     return [(item - mn) / diff for item in data]
-
-
-def combine_data(prices, volumes):
-    return [prices[item]['input'].extend(volumes[item]) for item in range(len(prices))]
 
 
 def baseline_model():
@@ -79,25 +80,28 @@ url = url.format(curr, fiat, samples, exchange)
 
 data = get_data(url)
 prices = get_prices(data)
-volumes = get_volumes(data)
 
-grouped_prices  = group(prices, 4)
-grouped_volumes = group(volumes, 4)
+semi_grouped = group(prices, step=4)
 
-# Remove 4th item from each group for the prices
-# and discard it for the volumes.
-# Keep the 4th price of each group as "y".
-three_items_prices  = [group[0:3] for group in grouped_prices if len(group) == 4]
-three_items_volumes = [group[0:3] for group in grouped_volumes if len(group) == 4]
-target_prices       = [group[3] for group in grouped_prices if len(group) == 4]
+grouped_data    = semi_grouped[semi_grouped['type'] == 'data']
+grouped_targets = semi_grouped[semi_grouped['type'] == 'target']
 
-# Put the three prices and volumes together:
-prices_and_volumes = [prices + volumes for prices, volumes in zip(three_items_prices, three_items_volumes)]
+grouped_data[-1:]
+
+del(grouped_data['time'])
+del(grouped_data['type'])
+
+# Cut trailing data (remember that we need to group by triplets):
+while len(grouped_data) & 3 > 0:
+    grouped_data = grouped_data[:-1]
 
 
-# Let's obtain "X" and "y" sets:
-X_train, X_test, y_train, y_test = train_test_split(prices_and_volumes, target_prices, test_size=0.3)
+X = [np.concatenate((grouped_data.iloc[a], grouped_data.iloc[a + 1], grouped_data.iloc[a + 2])) for a in range(0, len(grouped_data), 3)]
+y = grouped_targets['close'].values.tolist()
 
+
+# # Let's obtain "X" and "y" training and test sets:
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 
 X_train = np.array(X_train)
 X_test  = np.array(X_test)
@@ -107,17 +111,27 @@ y_test  = np.array(y_test)
 
 clf = RandomForestRegressor()
 
-clf.fit(X_train, y_train)
+%time clf.fit(X_train, y_train)
 
-# clf.score(X_test, y_test)
-
-
-predicted = clf.predict(X_test[0].reshape(-1, 6))
-actual = y_test[0]
+print('Classifier score is: ', clf.score(X_test, y_test))
 
 
-difference = (actual/predicted - 1) * 100
+# Let's use these last values to try predicting:
+X_last = X.pop(-1)
+y_last = y.pop(-1)
+
+X_last = np.array(X_last)
+features_number = len(X_last)
+
+predicted = clf.predict(X_last.reshape(-1, features_number))
+actual    = y_last
+
+
+difference = (1 - actual/predicted) * 100
 
 print('Predicted:', predicted[0])
 print('Actual:   ', actual)
 print('Error:    {}%'.format(round(difference[0], 2)))
+
+
+######################################################
