@@ -36,32 +36,13 @@ def get_prices(data):
 
 
 def group(data, step=4):
-
     data['group_info'] = ['data' if (index+1)%step != 0 else 'target' for index, _ in data.iterrows()]
-
     data['type'] = data['group_info'].astype('category')
 
     del(data['group_info'])
 
     return data
 
-
-def normalize(data):
-    mx   = max(data)
-    mn   = min(data)
-    diff = mx - mn
-
-    return [(item - mn) / diff for item in data]
-
-
-def baseline_model():
-    model = Sequential()
-    model.add(Dense(6, input_dim=6, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(1, kernel_initializer='normal'))
-
-    model.compile(optimizer='rmsprop', loss='mse')
-
-    return model
 
 
 # Get data:
@@ -85,8 +66,6 @@ semi_grouped = group(prices, step=4)
 
 grouped_data    = semi_grouped[semi_grouped['type'] == 'data']
 grouped_targets = semi_grouped[semi_grouped['type'] == 'target']
-
-grouped_data[-1:]
 
 del(grouped_data['time'])
 del(grouped_data['type'])
@@ -132,6 +111,3 @@ difference = (1 - actual/predicted) * 100
 print('Predicted:', predicted[0])
 print('Actual:   ', actual)
 print('Error:    {}%'.format(round(difference[0], 2)))
-
-
-######################################################
