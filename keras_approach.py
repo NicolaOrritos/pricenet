@@ -93,10 +93,14 @@ semi_grouped = group(prices, step=4)
 grouped_data    = semi_grouped[semi_grouped['type'] == 'data']
 grouped_targets = semi_grouped[semi_grouped['type'] == 'target']
 
+grouped_data['day_of_week'] = grouped_data['time'].dt.dayofweek
+grouped_data['month'] = grouped_data['time'].dt.month
+grouped_data['time_of_day'] = grouped_data['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
+
 del(grouped_data['time'])
 del(grouped_data['type'])
 
-del(grouped_data['open'])
+# del(grouped_data['open'])
 del(grouped_data['volumefrom'])
 
 
@@ -107,8 +111,6 @@ while len(grouped_data) & 3 > 0:
 
 # Scale data before grouping them:
 grouped_data = scale(grouped_data)
-
-grouped_data.head()
 
 
 X = [np.concatenate((grouped_data.iloc[a], grouped_data.iloc[a + 1], grouped_data.iloc[a + 2])) for a in range(0, len(grouped_data), 3)]
@@ -151,9 +153,11 @@ pipeline = Pipeline(estimators)
 
 pipeline.fit(X_train, y_train, regressor__callbacks=[tensorboard])
 
+score = pipeline.score(X_test, y_test)
 mse = validate_model(pipeline, X_test, y_test)
 
-print('MSE: ', mse)
+print('Score: ', score)
+print('MSE:   ', mse)
 
 # # Fix random seed for reproducibility
 # seed = 7
