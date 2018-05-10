@@ -9,7 +9,19 @@ import data_provider as dp
 
 def run_and_score():
     # Get data:
-    X, y = dp.load()
+    data = dp.load()
+
+    # Remove redundant columns:
+    del(data['time'])
+    del(data['type'])
+    del(data['open'])
+    del(data['day_of_month_scaled'])
+
+    # Scale them:
+    data = dp.scale(data)
+
+    # Split into X and y:
+    X, y = dp.split_to_X_y(data)
 
 
     # # Let's obtain "X" and "y" training and test sets:

@@ -25,12 +25,24 @@ def validate_model(model, test_data, test_targets):
     print(test_targets)
     print(predictions)
 
-    return ((test_targets - predictions)**2).mean(axis=None)
+    return np.absolute(1 - predictions / test_targets).mean(axis=None)
 
 
 
 # Get data:
-X, y = dp.load()
+data = dp.load()
+
+# Remove redundant columns:
+del(data['time'])
+del(data['type'])
+del(data['open'])
+del(data['day_of_month_scaled'])
+
+# Scale them:
+data = dp.scale(data)
+
+# Split into X and y:
+X, y = dp.split_to_X_y(data)
 
 X_last = np.array(X.pop())
 y_last = np.array(y.pop())
@@ -49,8 +61,10 @@ features_number = len(X[0])
 def baseline_model():
     model = Sequential()
     model.add(Dense(features_number,    input_dim=features_number,    activation='relu'))
-    model.add(Dense(1024,               kernel_initializer='normal',  activation='tanh'))
-    model.add(Dense(512,                kernel_initializer='normal',  activation='relu'))
+    model.add(Dense(256,                kernel_initializer='normal',  activation='relu'))
+    model.add(Dense(256,                kernel_initializer='normal',  activation='tanh'))
+    model.add(Dense(128,                kernel_initializer='normal',  activation='tanh'))
+    model.add(Dense(128,                kernel_initializer='normal',  activation='relu'))
     model.add(Dense(1))
 
     model.compile(optimizer='adam', loss='mean_squared_error')
@@ -70,10 +84,10 @@ pipeline = Pipeline(estimators)
 pipeline.fit(X_train, y_train, regressor__callbacks=[tensorboard])
 
 score = pipeline.score(X_test, y_test)
-mse = validate_model(pipeline, X_test, y_test)
+error = validate_model(pipeline, X_test, y_test)
 
 print('Score: ', score)
-print('MSE:   ', mse)
+print('Error: {}%'.format(round(error * 100, 4)))
 
 # # Fix random seed for reproducibility
 # seed = 7

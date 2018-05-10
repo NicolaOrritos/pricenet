@@ -7,20 +7,20 @@ import json
 import pytz
 
 
-def GET(url):
+def _GET(url):
     req  = requests.get(url)
     data = req.json()
 
     return data
 
 
-def get_data(url):
-    raw = GET(url)
+def _get_data(url):
+    raw = _GET(url)
 
     return json.dumps(raw['Data'])
 
 
-def get_prices(data):
+def _get_prices(data):
 
     aux = pd.read_json(data, convert_dates=['time'])
 
@@ -33,7 +33,7 @@ def get_prices(data):
     return result
 
 
-def group(data, step=4):
+def _group(data, step=4):
     data['group_info'] = ['data' if (index+1)%step != 0 else 'target' for index, _ in data.iterrows()]
     data['type'] = data['group_info'].astype('category')
 
@@ -41,14 +41,18 @@ def group(data, step=4):
 
     return data
 
+def _bundle_groups(data, index, group_size):
+    return np.concatenate([data.iloc[index + a] for a in range(0, group_size)])
+
 def scale(data_frame):
     data_frame -= data_frame.min()
     data_frame /= data_frame.max()
 
     return data_frame
 
-def bundle_groups(data, index, group_size):
-    return np.concatenate([data.iloc[index + a] for a in range(0, group_size)])
+def split_to_X_y(data, groups_size):
+    X = [_bundle_groups(data, index, usable_items) for index in range(0, len(data), usable_items)]
+    y = grouped_targets['close'].values.tolist()
 
 
 def load():
@@ -67,15 +71,15 @@ def load():
 
     url = url.format(curr, fiat, samples, exchange)
 
-    data = get_data(url)
-    prices = get_prices(data)
+    data = _get_data(url)
+    prices = _get_prices(data)
 
 
     group_items  = 4
     usable_items = group_items - 1
 
 
-    semi_grouped = group(prices, step=group_items)
+    semi_grouped = _group(prices, step=group_items)
 
     grouped_data    = semi_grouped.loc[semi_grouped['type'] == 'data']
     grouped_targets = semi_grouped.loc[semi_grouped['type'] == 'target']
@@ -85,22 +89,14 @@ def load():
     grouped_targets = grouped_targets.copy()
 
     grouped_data['day_of_week'] = grouped_data['time'].dt.dayofweek
-    grouped_data['day_of_month'] = grouped_data['time'].dt.day / grouped_data['time'].dt.days_in_month
+    grouped_data['day_of_month'] = grouped_data['time'].dt.day
+    grouped_data['day_of_month_scaled'] = grouped_data['time'].dt.day / grouped_data['time'].dt.days_in_month
     grouped_data['month'] = grouped_data['time'].dt.month
     grouped_data['time_of_day'] = grouped_data['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
 
-    del(grouped_data['time'])
-    del(grouped_data['type'])
-    del(grouped_data['open'])
 
     # Cut trailing data (remember that we are grouping by triplets):
     while len(grouped_data) % usable_items > 0:
         grouped_data = grouped_data[:-1]
 
-    grouped_data = scale(grouped_data)
-
-    X = [bundle_groups(grouped_data, index, usable_items) for index in range(0, len(grouped_data), usable_items)]
-    y = grouped_targets['close'].values.tolist()
-
-
-    return X, y
+    return grouped_data
