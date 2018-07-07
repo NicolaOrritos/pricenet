@@ -6,3 +6,4 @@
 *.csv
 *.h5
 *.zip
+/sandbox.py
