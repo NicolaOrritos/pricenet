@@ -11,7 +11,7 @@ import data_provider as dp
 def run_and_score():
     # Get data:
     # print('Loading data...')
-    data = dp.load()
+    data = dp.load(resolution='day')
 
     # Cut the first ones until len(data) % 4 == 0:
     # print('Cutting trailing data off...')

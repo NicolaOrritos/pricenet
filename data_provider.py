@@ -88,30 +88,43 @@ def cut_trailing(data, groups_size=4):
     return data
 
 
-def load(groups_size=4):
-    """ Returns `X` and `y` arrays, the former being the training data and the former the targets. """
+def load(groups_size=4, resolution='hour'):
+    """ Returns a dataset containing the prices for the time-period specified. """
     # Get data:
     curr = 'BTC'
     fiat = 'USD'
-    samples = 24 * 82  # 82 days worth of hour-sized data
     exchange = 'CCCAGG'
 
-    url = ('https://min-api.cryptocompare.com/data/histohour?'
-        +  'fsym={0}&tsym={1}'
-        +  '&limit={2}'
-        +  '&e={3}'
+    if resolution == 'hour':
+        samples = 24 * 82  # 82 days worth of hour-sized data
+    elif resolution == 'day':
+        samples = 5 * 365 + 1  # Five years worth of data
+    else:
+        # Assume hours:
+        resolution = 'hour'
+        samples = 24 * 82  # 82 days worth of hour-sized data
+
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
         +  '&aggregate=1')
 
-    url = url.format(curr, fiat, samples, exchange)
+    url = url.format(resolution, curr, fiat, samples, exchange)
 
     data = _get_data(url)
     prices = _get_prices(data)
+
+    print('Got {0} samples...'.format(len(prices.index)))
 
     prices['day_of_week'] = prices['time'].dt.dayofweek
     prices['day_of_month'] = prices['time'].dt.day
     prices['day_of_month_scaled'] = prices['time'].dt.day / prices['time'].dt.days_in_month
     prices['month'] = prices['time'].dt.month
-    prices['time_of_day'] = prices['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
+
+    # Do not consider if resolution is 'day':
+    if resolution == 'hour':
+        prices['time_of_day'] = prices['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
 
 
     return prices
