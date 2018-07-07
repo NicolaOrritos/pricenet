@@ -4,27 +4,49 @@ from time import sleep
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import numpy as np
+# import extended_data_provider as dp
 import data_provider as dp
 
 
 def run_and_score():
     # Get data:
+    # print('Loading data...')
     data = dp.load()
 
-    # Remove redundant columns:
-    del(data['time'])
-    del(data['type'])
-    del(data['open'])
-    del(data['day_of_month_scaled'])
+    # Cut the first ones until len(data) % 4 == 0:
+    # print('Cutting trailing data off...')
+    data = dp.cut_trailing(data, groups_size=4)
 
-    # Scale them:
-    data = dp.scale(data)
+    # Remove some useless fields:
+    # print('Removing useless fields...')
+    data = dp.remove_fields(data, ['time', 'open'])
+
+    # Scale them all:
+    # print('Scaling data...')
+    data, min_values, max_values = dp.scale(data)
+
+    # print('min values: ', min_values)
+    # print('MAX values: ', max_values)
+
+    # Cut a slice of the data,
+    # because otherwise it would take ages
+    # to run against the whole dataset:
+    # print('Slicing data...')
+    # data = data[-(4 * 20000):].copy()
 
     # Split into X and y:
-    X, y = dp.split_to_X_y(data)
+    # print('Splitting data to "X" and "y" sets...')
+    X, y = dp.split_to_X_y(data, groups_size=4)
+
+
+    # Saved for later usage:
+    features_number = len(X[0])
+    X_last = np.array(X.pop())
+    y_last = np.array(y.pop())
 
 
     # # Let's obtain "X" and "y" training and test sets:
+    # print('Splitting into training and test sets...')
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
     X_train = np.array(X_train)
@@ -35,14 +57,32 @@ def run_and_score():
 
     clf = RandomForestRegressor()
 
+    # print('Fitting model to data...')
     clf.fit(X_train, y_train)
+
+    # print('Scoring model...')
     score = clf.score(X_test, y_test)
 
-    print('Classifier score is: ', score)
+
+    # Try predicting latest prices:
+    print('##########################################')
+    print('This iteration performance:')
+    predicted = clf.predict(X_last.reshape(-1, features_number))[0]
+    actual    = y_last
+
+    difference = (1 - actual/predicted) * 100
+
+    print('Predicted:', (predicted * max_values['close'] + min_values['close']))
+    print('Actual:   ', (actual * max_values['close'] + min_values['close']))
+    print('Error:    {}%'.format(round(difference, 2)))
+    print('##########################################')
+
 
     return score
 
 
+
+print('Starting...')
 
 # Run multiple times and evaluate the average score:
 scores = []
@@ -53,6 +93,9 @@ for i in range(10):
     # We are kind and don't call the remote API too aggressively:
     sleep(2)
 
+    # print('============================')
+
 scores = np.array(scores)
 
+print('Calculating average score...')
 print('Average score: {}%'.format(round(scores.mean() * 100, 4)))

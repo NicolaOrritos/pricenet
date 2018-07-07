@@ -1,36 +1,31 @@
 #!/usr/bin/env python
 
-import requests
 import numpy as np
 import pandas as pd
 import json
 import pytz
 
 
-def _GET(url):
-    req  = requests.get(url)
-    data = req.json()
-
-    return data
-
-
-def _get_data(url):
-    raw = _GET(url)
-
-    return json.dumps(raw['Data'])
+def _get_data(file):
+    return pd.read_csv(file)
 
 
 def _get_prices(data):
 
-    aux = pd.read_json(data, convert_dates=['time'])
-
-    result = pd.DataFrame(aux, columns=['time', 'close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    df = data
 
     rome_tz = pytz.timezone('Europe/Rome')
 
-    result['time'].dt.tz_localize(pytz.UTC).dt.tz_convert(rome_tz)
+    df['time'] = pd.to_datetime(df['Timestamp'], unit='s')
+    df['time'].dt.tz_localize(pytz.UTC).dt.tz_convert(rome_tz)
 
-    return result
+    del(df['Timestamp'])
+    del(df['Weighted_Price'])
+    df = df.rename(columns={'Volume_(BTC)': 'volume_btc', 'Volume_(Currency)': 'volume_fiat'})
+    df = df.rename(columns={'Open': 'open', 'Close': 'close'})
+    df = df.rename(columns={'Low': 'low', 'High': 'high'})
+
+    return df
 
 
 def _group(data, step=4):
@@ -45,13 +40,10 @@ def _bundle_groups(data, index, group_size):
     return np.concatenate([data.iloc[index + a] for a in range(0, group_size)])
 
 def scale(data_frame):
-    min_values =  data_frame.min()
-    max_values =  data_frame.max()
-
     data_frame -= data_frame.min()
     data_frame /= data_frame.max()
 
-    return data_frame, min_values, max_values
+    return data_frame
 
 def remove_fields(data, fields):
     for field in fields:
@@ -59,7 +51,7 @@ def remove_fields(data, fields):
 
     return data
 
-def split_to_X_y(data, groups_size, fields_to_remove=[]):
+def split_to_X_y(data, groups_size):
     semi_grouped = _group(data, step=groups_size)
 
     grouped_data    = semi_grouped.loc[semi_grouped['type'] == 'data']
@@ -83,28 +75,15 @@ def split_to_X_y(data, groups_size, fields_to_remove=[]):
 def cut_trailing(data, groups_size=4):
     # Cut trailing data (remember that we are grouping by 'groups_size'):
     while len(data) % groups_size > 0:
-        data = data[:-1]
+        data = data.drop(len(data) - 1)
 
     return data
 
 
-def load(groups_size=4):
+def load():
     """ Returns `X` and `y` arrays, the former being the training data and the former the targets. """
     # Get data:
-    curr = 'BTC'
-    fiat = 'USD'
-    samples = 24 * 82  # 82 days worth of hour-sized data
-    exchange = 'CCCAGG'
-
-    url = ('https://min-api.cryptocompare.com/data/histohour?'
-        +  'fsym={0}&tsym={1}'
-        +  '&limit={2}'
-        +  '&e={3}'
-        +  '&aggregate=1')
-
-    url = url.format(curr, fiat, samples, exchange)
-
-    data = _get_data(url)
+    data = _get_data('coinbaseUSD_1-min_data_2014-12-01_to_2018-03-27.csv')
     prices = _get_prices(data)
 
     prices['day_of_week'] = prices['time'].dt.dayofweek
