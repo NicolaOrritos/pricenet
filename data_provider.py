@@ -44,14 +44,22 @@ def _group(data, step=4):
 def _bundle_groups(data, index, group_size):
     return np.concatenate([data.iloc[index + a] for a in range(0, group_size)])
 
-def scale(data_frame):
+def min_max_scale(data_frame):
     min_values =  data_frame.min()
     max_values =  data_frame.max()
 
-    data_frame -= data_frame.min()
-    data_frame /= data_frame.max()
+    max_min_diff = max_values - min_values
+
+    data_frame = (data_frame - min_values) / max_min_diff
 
     return data_frame, min_values, max_values
+
+def min_max_rescale(num, min_value, max_value):
+    """ Performs the inverse of a min-max scaler (see method above),
+        applied to a single number """
+    num = num * (max_value - min_value) + min_value
+
+    return num
 
 def remove_fields(data, fields):
     for field in fields:
@@ -96,13 +104,13 @@ def load(groups_size=4, resolution='hour'):
     exchange = 'CCCAGG'
 
     if resolution == 'hour':
-        samples = 24 * 82  # 82 days worth of hour-sized data
+        samples = 24 * 83  # 83 days worth of hour-sized data
     elif resolution == 'day':
         samples = 5 * 365 + 1  # Five years worth of data
     else:
         # Assume hours:
         resolution = 'hour'
-        samples = 24 * 82  # 82 days worth of hour-sized data
+        samples = 24 * 83  # 83 days worth of hour-sized data
 
     url = ('https://min-api.cryptocompare.com/data/histo{0}?'
         +  'fsym={1}&tsym={2}'
@@ -111,6 +119,8 @@ def load(groups_size=4, resolution='hour'):
         +  '&aggregate=1')
 
     url = url.format(resolution, curr, fiat, samples, exchange)
+    
+    print('Using "{0}"...'.format(url))
 
     data = _get_data(url)
     prices = _get_prices(data)

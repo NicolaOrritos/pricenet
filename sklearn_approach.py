@@ -8,11 +8,7 @@ import numpy as np
 import data_provider as dp
 
 
-def run_and_score():
-    # Get data:
-    # print('Loading data...')
-    data = dp.load(resolution='day')
-
+def run_and_score(data):
     # Cut the first ones until len(data) % 4 == 0:
     # print('Cutting trailing data off...')
     data = dp.cut_trailing(data, groups_size=4)
@@ -23,7 +19,7 @@ def run_and_score():
 
     # Scale them all:
     # print('Scaling data...')
-    data, min_values, max_values = dp.scale(data)
+    data, min_values, max_values = dp.min_max_scale(data)
 
     # print('min values: ', min_values)
     # print('MAX values: ', max_values)
@@ -70,10 +66,13 @@ def run_and_score():
     predicted = clf.predict(X_last.reshape(-1, features_number))[0]
     actual    = y_last
 
-    difference = (1 - actual/predicted) * 100
+    difference = (1 - actual / predicted) * 100
 
-    print('Predicted:', (predicted * max_values['close'] + min_values['close']))
-    print('Actual:   ', (actual * max_values['close'] + min_values['close']))
+    predicted = dp.min_max_rescale(predicted, min_values['close'], max_values['close'])
+    actual    = dp.min_max_rescale(actual,    min_values['close'], max_values['close'])
+
+    print('Predicted:', predicted)
+    print('Actual:   ', actual)
     print('Error:    {}%'.format(round(difference, 2)))
     print('##########################################')
 
@@ -84,10 +83,17 @@ def run_and_score():
 
 print('Starting...')
 
+# Get data:
+print('Loading data...')
+data = dp.load(resolution='hour')
+
+runs = 10
+
 # Run multiple times and evaluate the average score:
+print('Performing the linear-regression {0} times...'.format(runs))
 scores = []
-for i in range(10):
-    score = run_and_score()
+for i in range(runs):
+    score = run_and_score(data.copy())
     scores.append(score)
 
     # We are kind and don't call the remote API too aggressively:

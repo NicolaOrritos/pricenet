@@ -39,7 +39,7 @@ del(data['open'])
 del(data['day_of_month_scaled'])
 
 # Scale them:
-data = dp.scale(data)
+data = dp.min_max_scale(data)
 
 # Split into X and y:
 X, y = dp.split_to_X_y(data)
