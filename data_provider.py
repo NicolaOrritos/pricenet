@@ -141,7 +141,7 @@ def merge(data_frames, on_column='time'):
     return merged
 
 
-def load(groups_size=4, resolution='hour'):
+def load(resolution='hour'):
     """ Returns a dataset containing the prices for the time-period specified. """
     # Get data:
     curr = 'BTC'

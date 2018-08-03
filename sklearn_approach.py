@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from random import randint
 from time import sleep
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
@@ -11,11 +12,13 @@ import data_provider as dp
 def run_and_score(data):
     # Cut the first ones until len(data) % 4 == 0:
     # print('Cutting trailing data off...')
-    data = dp.cut_trailing(data, groups_size=4)
+    # data = dp.cut_trailing(data, groups_size=4)
 
     # Remove some useless fields:
     # print('Removing useless fields...')
-    data = dp.remove_fields(data, ['time', 'open'])
+    data = dp.remove_fields(data, ['time'])
+
+    data.head()
 
     # Scale them all:
     # print('Scaling data...')
@@ -37,13 +40,16 @@ def run_and_score(data):
 
     # Saved for later usage:
     features_number = len(X[0])
-    X_last = np.array(X.pop())
-    y_last = np.array(y.pop())
+    pick = randint(0, (len(X) - 1))
+    X_last = np.array(X[pick])
+    y_last = np.array(y[pick])
 
 
     # # Let's obtain "X" and "y" training and test sets:
     # print('Splitting into training and test sets...')
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+    # print('Sizes: training-set X => {0}, y => {1}; test-set X => {2}, y => {3}'.format(len(X_train), len(y_train), len(X_test), len(y_test)))
 
     X_train = np.array(X_train)
     X_test  = np.array(X_test)
@@ -68,8 +74,8 @@ def run_and_score(data):
 
     difference = (1 - actual / predicted) * 100
 
-    predicted = dp.min_max_rescale(predicted, min_values['close'], max_values['close'])
-    actual    = dp.min_max_rescale(actual,    min_values['close'], max_values['close'])
+    predicted = dp.min_max_rescale(predicted, min_values['usd_close'], max_values['usd_close'])
+    actual    = dp.min_max_rescale(actual,    min_values['usd_close'], max_values['usd_close'])
 
     print('Predicted:', predicted)
     print('Actual:   ', actual)
