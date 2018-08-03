@@ -20,29 +20,26 @@ def _get_data(url):
     return json.dumps(raw['Data'])
 
 
-def _get_prices(data):
+def _get_prices(data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto']):
 
     aux = pd.read_json(data, convert_dates=['time'])
 
     result = pd.DataFrame(aux, columns=['time', 'close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+
+
+    new_names = {}
+
+    for col in prefixed_cols:
+        new_names[col] = prefix + col
+
+    result = result.rename(columns=new_names)
+
 
     rome_tz = pytz.timezone('Europe/Rome')
 
     result['time'].dt.tz_localize(pytz.UTC).dt.tz_convert(rome_tz)
 
     return result
-
-
-def _group(data, step=4):
-    data['group_info'] = ['data' if (index+1)%step != 0 else 'target' for index, _ in data.iterrows()]
-    data['type'] = data['group_info'].astype('category')
-
-    del(data['group_info'])
-
-    return data
-
-def _bundle_groups(data, index, group_size):
-    return np.concatenate([data.iloc[index + a] for a in range(0, group_size)])
 
 def min_max_scale(data_frame):
     min_values =  data_frame.min()
@@ -68,22 +65,15 @@ def remove_fields(data, fields):
     return data
 
 def split_to_X_y(data, groups_size, fields_to_remove=[]):
-    semi_grouped = _group(data, step=groups_size)
-
-    grouped_data    = semi_grouped.loc[semi_grouped['type'] == 'data']
-    grouped_targets = semi_grouped.loc[semi_grouped['type'] == 'target']
-
-    del(grouped_data['type'])
-    del(grouped_targets['type'])
-
-    # Make them their own DataFrame to avoid operating on copies of `semi_grouped` one:
-    grouped_data = grouped_data.copy()
-    grouped_targets = grouped_targets.copy()
-
     usable_items = groups_size - 1
 
-    X = [_bundle_groups(grouped_data, index, usable_items) for index in range(0, len(grouped_data), usable_items)]
-    y = grouped_targets['close'].values.tolist()
+    y = data.iloc[usable_items:]['usd_close'].values.tolist()
+    split_X = [data.iloc[a:(a + usable_items)].values.tolist() for a in range(0, len(data) - usable_items)]
+
+    # print('Splits for each row of X:   ', len(split_X[0]))
+    # print('Length of every split in X: ', len(split_X[0][0]))
+
+    X = [np.concatenate(split) for split in split_X]
 
     return X, y
 
@@ -96,11 +86,65 @@ def cut_trailing(data, groups_size=4):
     return data
 
 
+def get_usd_data_url(resolution, curr, samples, exchange):
+    fiat = 'USD'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, fiat, samples, exchange)
+    return url
+
+def get_eur_data_url(resolution, curr, samples, exchange):
+    fiat = 'EUR'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, fiat, samples, exchange)
+    return url
+
+def get_jpy_data_url(resolution, curr, samples, exchange):
+    fiat = 'JPY'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, fiat, samples, exchange)
+    return url
+
+def get_krw_data_url(resolution, curr, samples, exchange):
+    fiat = 'KRW'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, fiat, samples, exchange)
+    return url
+
+
+def merge(data_frames, on_column='time'):
+
+    merged = data_frames[0]
+
+    for df in data_frames[1:]:
+        merged = merged.merge(df, on=on_column)
+
+    return merged
+
+
 def load(groups_size=4, resolution='hour'):
     """ Returns a dataset containing the prices for the time-period specified. """
     # Get data:
     curr = 'BTC'
-    fiat = 'USD'
     exchange = 'CCCAGG'
 
     if resolution == 'hour':
@@ -112,18 +156,16 @@ def load(groups_size=4, resolution='hour'):
         resolution = 'hour'
         samples = 24 * 83  # 83 days worth of hour-sized data
 
-    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
-        +  'fsym={1}&tsym={2}'
-        +  '&limit={3}'
-        +  '&e={4}'
-        +  '&aggregate=1')
+    usd_data = _get_data(get_usd_data_url(resolution, curr, samples, exchange))
+    eur_data = _get_data(get_eur_data_url(resolution, curr, samples, exchange))
+    krw_data = _get_data(get_krw_data_url(resolution, curr, samples, exchange))
+    jpy_data = _get_data(get_jpy_data_url(resolution, curr, samples, exchange))
+    usd_prices = _get_prices(usd_data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    eur_prices = _get_prices(eur_data, prefix='eur_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    krw_prices = _get_prices(krw_data, prefix='krw_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    jpy_prices = _get_prices(jpy_data, prefix='jpy_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
 
-    url = url.format(resolution, curr, fiat, samples, exchange)
-    
-    print('Using "{0}"...'.format(url))
-
-    data = _get_data(url)
-    prices = _get_prices(data)
+    prices = merge([usd_prices, eur_prices, krw_prices, jpy_prices], on_column='time')
 
     print('Got {0} samples...'.format(len(prices.index)))
 
