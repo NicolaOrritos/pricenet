@@ -130,6 +130,17 @@ def get_krw_data_url(resolution, curr, samples, exchange):
     url = url.format(resolution, curr, fiat, samples, exchange)
     return url
 
+def get_okx_data_url(resolution, curr, samples):
+    tether = 'USDT'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, tether, samples, 'OKEX')
+    return url
+
 
 def merge(data_frames, on_column='time'):
 
@@ -160,12 +171,14 @@ def load(resolution='hour'):
     eur_data = _get_data(get_eur_data_url(resolution, curr, samples, exchange))
     krw_data = _get_data(get_krw_data_url(resolution, curr, samples, exchange))
     jpy_data = _get_data(get_jpy_data_url(resolution, curr, samples, exchange))
+    okx_data = _get_data(get_okx_data_url(resolution, curr, samples))
     usd_prices = _get_prices(usd_data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     eur_prices = _get_prices(eur_data, prefix='eur_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     krw_prices = _get_prices(krw_data, prefix='krw_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     jpy_prices = _get_prices(jpy_data, prefix='jpy_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    okx_prices = _get_prices(okx_data, prefix='okx_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
 
-    prices = merge([usd_prices, eur_prices, krw_prices, jpy_prices], on_column='time')
+    prices = merge([usd_prices, eur_prices, krw_prices, jpy_prices, okx_prices], on_column='time')
 
     print('Got {0} samples...'.format(len(prices.index)))
 

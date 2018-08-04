@@ -24,15 +24,6 @@ def run_and_score(data):
     # print('Scaling data...')
     data, min_values, max_values = dp.min_max_scale(data)
 
-    # print('min values: ', min_values)
-    # print('MAX values: ', max_values)
-
-    # Cut a slice of the data,
-    # because otherwise it would take ages
-    # to run against the whole dataset:
-    # print('Slicing data...')
-    # data = data[-(4 * 20000):].copy()
-
     # Split into X and y:
     # print('Splitting data to "X" and "y" sets...')
     X, y = dp.split_to_X_y(data, groups_size=4)
@@ -76,14 +67,15 @@ def run_and_score(data):
 
     predicted = dp.min_max_rescale(predicted, min_values['usd_close'], max_values['usd_close'])
     actual    = dp.min_max_rescale(actual,    min_values['usd_close'], max_values['usd_close'])
+    error     = round(difference, 2)
 
     print('Predicted:', predicted)
     print('Actual:   ', actual)
-    print('Error:    {}%'.format(round(difference, 2)))
+    print('Error:    {}%'.format(error))
     print('##########################################')
 
 
-    return score
+    return score, error
 
 
 
@@ -98,9 +90,11 @@ runs = 10
 # Run multiple times and evaluate the average score:
 print('Performing the linear-regression {0} times...'.format(runs))
 scores = []
+errors = []
 for i in range(runs):
-    score = run_and_score(data.copy())
+    score, error = run_and_score(data.copy())
     scores.append(score)
+    errors.append(abs(error))
 
     # We are kind and don't call the remote API too aggressively:
     sleep(2)
@@ -108,6 +102,8 @@ for i in range(runs):
     # print('============================')
 
 scores = np.array(scores)
+errors = np.array(errors)
 
-print('Calculating average score...')
+print('Calculating average score and error...')
 print('Average score: {}%'.format(round(scores.mean() * 100, 4)))
+print('Average error: {}%'.format(round(errors.mean(), 4)))
