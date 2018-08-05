@@ -64,7 +64,7 @@ def remove_fields(data, fields):
 
     return data
 
-def split_to_X_y(data, groups_size, fields_to_remove=[]):
+def split_to_X_y(data, groups_size):
     usable_items = groups_size - 1
 
     y = data.iloc[usable_items:]['usd_close'].values.tolist()
@@ -191,5 +191,35 @@ def load(resolution='hour'):
     if resolution == 'hour':
         prices['time_of_day'] = prices['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
 
-
     return prices
+
+
+def find_swans(prices, resolution='hour', groups_size=4):
+    """ Finds black and white swans, where price between T and T - 1
+        varied more than 3% hourly or 10% daily.
+        Then outputs `groups_size` group of data, ending with the "Swan event". """
+
+    threshold = 0.03
+
+    if resolution == 'day':
+        threshold = 0.1
+
+    prices = prices.copy()
+
+    del(prices['time'])
+
+    prices, min_values, max_values = min_max_scale(prices)
+
+    pricesTminus1 = prices.iloc[(groups_size - 2):-1]['usd_close'].values.tolist()
+    pricesT       = prices.iloc[(groups_size - 1):]['usd_close'].values.tolist()
+
+    prices_couples = zip(pricesTminus1, pricesT)
+
+    # Prevent division-by-zero errors in the fraction some lines below ("priceTminus1 / priceT")
+    prices_couples = [(num, den) if den != 0 else (num + 0.1, den + 0.1) for num, den in prices_couples]
+
+    swans_indexes = [index for index, (priceTminus1, priceT) in enumerate(prices_couples) if abs(1 - priceTminus1 / priceT) >= threshold]
+
+    swans = [prices.iloc[index:(index + groups_size - 1)] for index in swans_indexes]
+
+    return swans, min_values, max_values
