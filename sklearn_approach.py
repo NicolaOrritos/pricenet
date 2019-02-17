@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 from random import randint
 from time import sleep
 from sklearn.ensemble import RandomForestRegressor
@@ -104,6 +105,12 @@ print('Starting...')
 
 resolution = 'day'
 
+if len(sys.argv) == 3 and sys.argv[1] == '-r':
+    resolution = sys.argv[2]
+
+print('Using resolution "{0}"...'.format(resolution))
+
+
 # Get data:
 print('Loading data...')
 data  = dp.load(resolution)
@@ -135,6 +142,7 @@ for i in range(runs):
     if (abs(error) < last_error):
         print('Dumping best model (as of now)...')
         dump(clf, 'best_model_{0}.joblib'.format(resolution))
+        last_error = error
 
 scores = np.array(scores)
 errors = np.array(errors)

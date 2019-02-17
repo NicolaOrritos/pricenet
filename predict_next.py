@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 import data_provider as dp
@@ -21,6 +22,12 @@ def prediction(data, clf):
 
 
 resolution = 'day'
+
+if len(sys.argv) == 3 and sys.argv[1] == '-r':
+    resolution = sys.argv[2]
+
+print('Using resolution "{0}"...'.format(resolution))
+
 
 data = dp.load_latest(resolution)
 
