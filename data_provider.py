@@ -218,7 +218,7 @@ def load(resolution='hour'):
         resolution = 'hour'
         samples = 24 * 83  # 83 days worth of hour-sized data
 
-    dowjones_data = _get_dowjones_data(get_dowjones_url(resolution='day'))
+    # dowjones_data = _get_dowjones_data(get_dowjones_url(resolution='day'))
     eur2usd_data = _get_data(get_eur2usd_data_url(resolution, samples, exchange))
     usd_data = _get_data(get_usd_data_url(resolution, curr, samples, exchange))
     eur_data = _get_data(get_eur_data_url(resolution, curr, samples, exchange))
@@ -227,8 +227,8 @@ def load(resolution='hour'):
     ltc_data = _get_data(get_btc_data_url(resolution, 'LTC', samples, exchange))
     eth_data = _get_data(get_btc_data_url(resolution, 'ETH', samples, exchange))
     xrp_data = _get_data(get_btc_data_url(resolution, 'XRP', samples, exchange))
-    okx_data = _get_data(get_okx_data_url(resolution, curr, samples))
-    dowjones_prices = _get_prices(dowjones_data, prefix='dow_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    # okx_data = _get_data(get_okx_data_url(resolution, curr, samples))
+    # dowjones_prices = _get_prices(dowjones_data, prefix='dow_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     eur2usd_prices = _get_prices(eur2usd_data, prefix='eur2usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     usd_prices = _get_prices(usd_data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     eur_prices = _get_prices(eur_data, prefix='eur_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
@@ -237,13 +237,13 @@ def load(resolution='hour'):
     ltc_prices = _get_prices(ltc_data, prefix='ltc_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     eth_prices = _get_prices(eth_data, prefix='eth_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     xrp_prices = _get_prices(xrp_data, prefix='xrp_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
-    okx_prices = _get_prices(okx_data, prefix='okx_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    # okx_prices = _get_prices(okx_data, prefix='okx_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
 
-    prices = merge([dowjones_prices, eur2usd_prices,
+    prices = merge([eur2usd_prices,
                     usd_prices, eur_prices,
                     krw_prices, jpy_prices,
                     ltc_prices, eth_prices,
-                    xrp_prices, okx_prices], on_column='time')
+                    xrp_prices], on_column='time')
 
     print('Got {0} samples...'.format(len(prices.index)))
 
