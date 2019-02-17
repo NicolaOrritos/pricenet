@@ -6,6 +6,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import numpy as np
 import data_provider as dp
+import pandas as pd
+from joblib import dump
 
 
 def eval_against_swans(clf, swans):
@@ -22,17 +24,18 @@ def eval_against_swans(clf, swans):
 
         # Prevent division-by-zero errors:
         if predicted == 0:
-            actual = actual + 0.1
-            predicted = predicted + 0.1
+            actual = actual + 0.0000000001
+            predicted = predicted + 0.0000000001
 
-        difference = (1 - actual / predicted) * 100
-        error      = round(difference, 2)
-        errors.append(error)
+        difference = 1 - actual / predicted
+
+        errors.append(difference)
 
     return score, np.array(errors).mean()
 
 
 def run_and_score(data):
+
     # Cut the first ones until len(data) % 4 == 0:
     # print('Cutting trailing data off...')
     # data = dp.cut_trailing(data, groups_size=4)
@@ -68,7 +71,6 @@ def run_and_score(data):
     y_train = np.array(y_train)
     y_test  = np.array(y_test)
 
-
     clf = RandomForestRegressor()
 
     # print('Fitting model to data...')
@@ -91,7 +93,7 @@ def run_and_score(data):
     print('This iteration performance:')
     print('Predicted:', predicted)
     print('Actual:   ', actual)
-    print('Error:     {}%'.format(error))
+    print('Error:     {}%'.format(abs(error)))
 
     return score, error, clf
 
@@ -100,10 +102,12 @@ def run_and_score(data):
 
 print('Starting...')
 
+resolution = 'day'
+
 # Get data:
 print('Loading data...')
-data  = dp.load(resolution='hour')
-swans, swans_min_values, swans_max_values = dp.find_swans(data, resolution='hour', groups_size=4)
+data  = dp.load(resolution)
+swans, swans_min_values, swans_max_values = dp.find_swans(data, resolution, groups_size=4)
 
 runs = 10
 
@@ -112,6 +116,9 @@ print('Performing the linear-regression {0} times...'.format(runs))
 
 scores = []
 errors = []
+
+# Track errors as [0,1] real numbers:
+last_error = 1
 
 for i in range(runs):
     print('##########################################')
@@ -123,7 +130,11 @@ for i in range(runs):
     swans_score, swans_error = eval_against_swans(clf, swans)
 
     print('Score against {0} swans: {1}%'.format(len(swans), round(swans_score * 100, 4)))
-    print('Error against {0} swans: {1}%'.format(len(swans), round(swans_error * 100, 4)))
+    print('Error against {0} swans: {1}%'.format(len(swans), round(abs(swans_error) * 100, 4)))
+
+    if (abs(error) < last_error):
+        print('Dumping best model (as of now)...')
+        dump(clf, 'best_model_{0}.joblib'.format(resolution))
 
 scores = np.array(scores)
 errors = np.array(errors)
@@ -132,4 +143,5 @@ print('##########################################')
 
 print('Calculating average score and error...')
 print('Average score: {}%'.format(round(scores.mean() * 100, 4)))
-print('Average error: {}%'.format(round(errors.mean(), 4)))
+print('Average error: {}%'.format(abs(round(errors.mean(), 4))))
+print('Swans percentage over samples: {}%'.format(round(len(swans)/len(data) * 100, 4)))

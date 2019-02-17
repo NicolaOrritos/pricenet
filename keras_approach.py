@@ -25,24 +25,27 @@ def validate_model(model, test_data, test_targets):
     print(test_targets)
     print(predictions)
 
+    location = test_targets[test_targets == 0].iloc
+
+    test_targets.iloc[location] += 0.1
+    predictions.iloc[location]  += 0.1
+
     return np.absolute(1 - predictions / test_targets).mean(axis=None)
 
 
 
 # Get data:
-data = dp.load()
+data = dp.load(resolution='hour')
 
-# Remove redundant columns:
-del(data['time'])
-del(data['type'])
-del(data['open'])
-del(data['day_of_month_scaled'])
+data = dp.remove_fields(data, ['time'])
 
-# Scale them:
-data = dp.min_max_scale(data)
+# Scale them all:
+# print('Scaling data...')
+data, min_values, max_values = dp.min_max_scale(data)
 
 # Split into X and y:
-X, y = dp.split_to_X_y(data)
+# print('Splitting data to "X" and "y" sets...')
+X, y = dp.split_to_X_y(data, groups_size=4)
 
 X_last = np.array(X.pop())
 y_last = np.array(y.pop())
@@ -62,8 +65,6 @@ def baseline_model():
     model = Sequential()
     model.add(Dense(features_number,    input_dim=features_number,    activation='relu'))
     model.add(Dense(256,                kernel_initializer='normal',  activation='relu'))
-    model.add(Dense(256,                kernel_initializer='normal',  activation='tanh'))
-    model.add(Dense(128,                kernel_initializer='normal',  activation='tanh'))
     model.add(Dense(128,                kernel_initializer='normal',  activation='relu'))
     model.add(Dense(1))
 

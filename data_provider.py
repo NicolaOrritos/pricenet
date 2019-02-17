@@ -20,6 +20,22 @@ def _get_data(url):
     return json.dumps(raw['Data'])
 
 
+def _get_dowjones_data(url):
+    raw = _GET(url)
+
+    map  = raw['Time Series (Daily)']
+
+    matrix = [{"time": key,
+               "close": float(val['4. close']),
+               "open":  float(val['1. open']),
+               "high":  float(val['2. high']),
+               "low":   float(val['3. low']),
+               "volumefrom": float(val['5. volume']),
+               "volumeto":   float(val['5. volume'])} for key, val in map.items()]
+
+    return json.dumps(matrix)
+
+
 def _get_prices(data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto']):
 
     aux = pd.read_json(data, convert_dates=['time'])
@@ -41,13 +57,14 @@ def _get_prices(data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'lo
 
     return result
 
+
 def min_max_scale(data_frame):
     min_values =  data_frame.min()
     max_values =  data_frame.max()
 
     max_min_diff = max_values - min_values
 
-    data_frame = (data_frame - min_values) / max_min_diff
+    data_frame = ((data_frame - min_values) + 0.0000000001) / (max_min_diff + 0.0000000001)
 
     return data_frame, min_values, max_values
 
@@ -85,6 +102,40 @@ def cut_trailing(data, groups_size=4):
 
     return data
 
+
+def get_dowjones_url(resolution='day'):
+
+    if resolution == 'day':
+        fn = 'TIME_SERIES_DAILY'
+    else:
+        fn = 'TIME_SERIES_INTRADAY'
+
+    url = ('https://www.alphavantage.co/query?function={0}&symbol=DJI'
+        +  '&outputsize=full&apikey=IV6ON6NSPGLE8JBO')
+
+    url = url.format(fn)
+    return url
+
+def get_eur2usd_data_url(resolution, samples, exchange):
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym=EUR&tsym=USD'
+        +  '&limit={1}'
+        +  '&e={2}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, samples, exchange)
+    return url
+
+def get_btc_data_url(resolution, curr, samples, exchange):
+    to = 'BTC'
+    url = ('https://min-api.cryptocompare.com/data/histo{0}?'
+        +  'fsym={1}&tsym={2}'
+        +  '&limit={3}'
+        +  '&e={4}'
+        +  '&aggregate=1')
+
+    url = url.format(resolution, curr, to, samples, exchange)
+    return url
 
 def get_usd_data_url(resolution, curr, samples, exchange):
     fiat = 'USD'
@@ -167,18 +218,32 @@ def load(resolution='hour'):
         resolution = 'hour'
         samples = 24 * 83  # 83 days worth of hour-sized data
 
+    dowjones_data = _get_dowjones_data(get_dowjones_url(resolution='day'))
+    eur2usd_data = _get_data(get_eur2usd_data_url(resolution, samples, exchange))
     usd_data = _get_data(get_usd_data_url(resolution, curr, samples, exchange))
     eur_data = _get_data(get_eur_data_url(resolution, curr, samples, exchange))
     krw_data = _get_data(get_krw_data_url(resolution, curr, samples, exchange))
     jpy_data = _get_data(get_jpy_data_url(resolution, curr, samples, exchange))
+    ltc_data = _get_data(get_btc_data_url(resolution, 'LTC', samples, exchange))
+    eth_data = _get_data(get_btc_data_url(resolution, 'ETH', samples, exchange))
+    xrp_data = _get_data(get_btc_data_url(resolution, 'XRP', samples, exchange))
     okx_data = _get_data(get_okx_data_url(resolution, curr, samples))
+    dowjones_prices = _get_prices(dowjones_data, prefix='dow_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    eur2usd_prices = _get_prices(eur2usd_data, prefix='eur2usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     usd_prices = _get_prices(usd_data, prefix='usd_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     eur_prices = _get_prices(eur_data, prefix='eur_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     krw_prices = _get_prices(krw_data, prefix='krw_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     jpy_prices = _get_prices(jpy_data, prefix='jpy_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    ltc_prices = _get_prices(ltc_data, prefix='ltc_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    eth_prices = _get_prices(eth_data, prefix='eth_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
+    xrp_prices = _get_prices(xrp_data, prefix='xrp_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
     okx_prices = _get_prices(okx_data, prefix='okx_', prefixed_cols=['close', 'open', 'high', 'low', 'volumefrom', 'volumeto'])
 
-    prices = merge([usd_prices, eur_prices, krw_prices, jpy_prices, okx_prices], on_column='time')
+    prices = merge([dowjones_prices, eur2usd_prices,
+                    usd_prices, eur_prices,
+                    krw_prices, jpy_prices,
+                    ltc_prices, eth_prices,
+                    xrp_prices, okx_prices], on_column='time')
 
     print('Got {0} samples...'.format(len(prices.index)))
 
@@ -192,6 +257,15 @@ def load(resolution='hour'):
         prices['time_of_day'] = prices['time'].dt.time.apply(lambda time: str(time).split(':')[0]).astype(int)
 
     return prices
+
+
+def load_latest(resolution='day'):
+    data = load(resolution)
+    data = data.tail(3)
+
+    remove_fields(data, ['time'])
+
+    return data
 
 
 def find_swans(prices, resolution='hour', groups_size=4):
